@@ -1,0 +1,115 @@
+
+
+CC = F:\\MentorGraphics\\Sourcery_CodeBench_Lite_for_ARM_GNU_Linux\\bin\\arm-none-linux-gnueabi-gcc
+CFLAGS = -c -O2 -D_SIMCOM_WINDOWS_
+
+LD_FLAGS = -ldsi_netctrl -lloc_stub -llog\
+    -lqdi \
+    -lqmi_client_helper \
+    -lqmi -lqmiservices -lqmi_client_qmux -lqmiidl \
+    -lqmi_csi -lqmi_common_so -lqmi_cci -lqmi_sap -lqmi_encdec \
+    -lnetmgr -lrmnetctl -ldiag -lconfigdb -lxml -ldsutils \
+    -ltime_genoff -lgthread-2.0 -lglib-2.0 \
+	-lmcm -lmcm_log_util -lrt -ldl
+
+	 
+	 
+MAIN_DIR = .
+
+TARGET_BIN_DIR = $(MAIN_DIR)/bin
+TARGET_OBJ_DIR = $(MAIN_DIR)/obj
+
+BIN_NAME  = demo_app
+
+TEST_DIR = $(MAIN_DIR)
+TESTC_DIR = $(MAIN_DIR)/src
+
+SRC_DIR = $(TEST_DIR) 
+
+INCLUDE_PREFIX = -I
+
+LINK_PREFIX = -L
+
+ALL_PATHS = $(SRC_DIR)
+ALL_PATHS += ./inc
+ALL_PATHS += ./sdk-includes/common
+ALL_PATHS += ./sdk-includes/data
+ALL_PATHS += ./sdk-includes/dsi
+ALL_PATHS += ./sdk-includes/dsutils
+ALL_PATHS += ./sdk-includes/gps
+ALL_PATHS += ./sdk-includes/mcm
+ALL_PATHS += ./sdk-includes/qmi
+ALL_PATHS += ./sdk-includes/qmi-framework
+ALL_PATHS += ./sdk-includes/linux/spi
+ALL_PATHS += ./sdk-includes/mqtt
+ALL_PATHS += ./sdk-includes/curl
+ALL_PATHS += ./sdk-includes/openssl
+ALL_PATHS += ./sdk-includes
+
+
+ALL_INCLUDES = $(addprefix $(INCLUDE_PREFIX), $(ALL_PATHS))
+
+
+ALL_LINKS = $(addprefix $(LINK_PREFIX), ./simcomlib)
+ALL_LINKS += $(addprefix $(LINK_PREFIX), ./libs)
+
+OBJ_CMD = -o 
+
+LD_CMD = -o
+
+TEST_OBJS = $(TARGET_OBJ_DIR)/GPSControl.o \
+			$(TARGET_OBJ_DIR)/ADC.o \
+			$(TARGET_OBJ_DIR)/BTControl.o \
+			$(TARGET_OBJ_DIR)/demoVersion.o \
+			$(TARGET_OBJ_DIR)/LedControl.o \
+			$(TARGET_OBJ_DIR)/GpioControl.o \
+			$(TARGET_OBJ_DIR)/EthControl.o \
+			$(TARGET_OBJ_DIR)/I2C.o \
+			$(TARGET_OBJ_DIR)/OTAUpgrade.o \
+			$(TARGET_OBJ_DIR)/spidev_test.o \
+			$(TARGET_OBJ_DIR)/TCPDemo.o \
+			$(TARGET_OBJ_DIR)/uart_debug.o \
+			$(TARGET_OBJ_DIR)/uartapp.o \
+			$(TARGET_OBJ_DIR)/app_timer.o \
+			$(TARGET_OBJ_DIR)/FTPControl.o \
+			$(TARGET_OBJ_DIR)/LinuxTimer.o \
+			$(TARGET_OBJ_DIR)/simcom_common.o \
+			$(TARGET_OBJ_DIR)/simcom_test_main.o \
+			$(TARGET_OBJ_DIR)/main.o
+
+BIN_OBJS = $(TEST_OBJS) 
+
+$(TARGET_OBJ_DIR)/%.o:$(TESTC_DIR)/%.c
+	echo ---------------------------------------------------------
+	#echo $(ALL_PATHS)
+	#echo $(ALL_INCLUDES)
+	echo Build OBJECT $(@) from SOURCE $<
+	$(CC) $(CFLAGS) $(ALL_INCLUDES) $(OBJ_CMD) $@ $<
+	echo ---------------------------------------------------------
+
+$(TARGET_OBJ_DIR)/%.o:$(TESTC_DIR)/%.cpp
+	#echo $(ALL_PATHS)
+	#echo $(ALL_INCLUDES)
+	echo Build OBJECT $(@) from SOURCE $<
+	$(CC) $(CFLAGS) $(ALL_INCLUDES) $(OBJ_CMD) $@ $<
+	echo ---------------------------------------------------------
+
+.PHONY: all clean
+
+all:prep bin 
+
+prep:
+	@if test ! -d $(TARGET_BIN_DIR); then mkdir $(TARGET_BIN_DIR); fi
+	@if test ! -d $(TARGET_OBJ_DIR); then mkdir $(TARGET_OBJ_DIR); fi
+
+bin:$(BIN_OBJS)
+	#@echo $(ALL_LINKS)
+	@echo Create bin file $(BIN_NAME)
+	@$(CC)  $(ALL_LINKS) -lpthread  $(LD_FLAGS) $(LD_CMD) $(TARGET_BIN_DIR)/$(BIN_NAME) $^ $(MAIN_DIR)/libs/libsdk.a
+	@echo ---------------------------------------------------------
+	
+clean:
+	@rm -fr $(TARGET_OBJ_DIR) $(TARGET_BIN_DIR) 
+	
+
+
