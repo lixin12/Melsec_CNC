@@ -1,5 +1,5 @@
 #include "log.h"
-#include "Siemens_CNC.h"
+#include "Melsec_CNC.h"
 #include "usr_cfg.h"
 #include <stdio.h>
 #include <unistd.h>
@@ -121,7 +121,7 @@ void Logic(void)
 	for(;;)
 	{
 		//zlg_debug("logic running \r\n");
-		app_Si_CNC_Logic();
+		app_melsec_cnc_logic();
 		usleep(15000);
 	}
 }

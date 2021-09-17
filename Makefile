@@ -62,10 +62,10 @@ TEST_OBJS = $(TARGET_OBJ_DIR)/IOT_mqtt_pub.o \
 			$(TARGET_OBJ_DIR)/IOT_DomainNameToIP.o\
 			$(TARGET_OBJ_DIR)/GPSControl.o\
 			$(TARGET_OBJ_DIR)/IOT_GPS.o\
-			$(TARGET_OBJ_DIR)/Siemens_CNC_CELL.o\
-			$(TARGET_OBJ_DIR)/Siemens_CNC_Analyze.o\
-			$(TARGET_OBJ_DIR)/Siemens_CNC_Command.o\
-			$(TARGET_OBJ_DIR)/Siemens_CNC.o\
+			$(TARGET_OBJ_DIR)/Melsec_CNC_CELL.o\
+			$(TARGET_OBJ_DIR)/Melsec_CNC_Analyze.o\
+			$(TARGET_OBJ_DIR)/Melsec_CNC_Command.o\
+			$(TARGET_OBJ_DIR)/Melsec_CNC.o\
 			$(TARGET_OBJ_DIR)/main.o 
 
 LIB_OBJS =  $(TARGET_OBJ_DIR)/IOT_mqtt_pub.o \
@@ -85,9 +85,9 @@ LIB_OBJS =  $(TARGET_OBJ_DIR)/IOT_mqtt_pub.o \
 			$(TARGET_OBJ_DIR)/IOT_DomainNameToIP.o\
 			$(TARGET_OBJ_DIR)/GPSControl.o\
 			$(TARGET_OBJ_DIR)/IOT_GPS.o\
-			$(TARGET_OBJ_DIR)/Siemens_CNC_Analyze.o\
-			$(TARGET_OBJ_DIR)/Siemens_CNC_Command.o\
-			$(TARGET_OBJ_DIR)/Siemens_CNC.o\
+			$(TARGET_OBJ_DIR)/Melsec_CNC_Analyze.o\
+			$(TARGET_OBJ_DIR)/Melsec_CNC_Command.o\
+			$(TARGET_OBJ_DIR)/Melsec_CNC.o\
 
 
 STD_LIB= $(LIB_PATH)/usr/lib/libdsi_netctrl.so     \

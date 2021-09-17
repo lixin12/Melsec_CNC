@@ -5,7 +5,7 @@
         "siemens_s7.h": "c",
         "type.h": "c",
         "simcom_lbs.h": "c",
-        "siemens_cnc.h": "c",
+        "Melsec_CNC.h": "c",
         "log.h": "c"
     }
 }

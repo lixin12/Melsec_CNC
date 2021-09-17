@@ -1,12 +1,58 @@
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
+#include <stdlib.h> 
+#include <sys/poll.h> 
 #include "type.h"
 #include "log.h"
-#include "Siemens_CNC.h"
+#include "Melsec_CNC.h"
 static char result[MQTT_MSG_MAX_LEN-40] = {0};
+static char err_msg[100] = {0};
+typedef struct{
+    int m_nCncStatus;
+    int m_ProgramStatus;
+    int m_nAlarmNum;
+	char m_sSpeed[100];
+	char m_sFeedrate[100];
+	char m_sFCmd[100];
+	char m_sSpindleOverride[100];
+	char m_sdFeedOverride[100];
+	char m_sCurProgramBlockNo[100];
+	char m_snToolNum[100];
+	char m_sdLoad[100];
+	char m_sdTemp[100];
+	char m_sdLoad_x[100];
+	char m_sdLoad_y[100];
+	char m_sdLoad_z[100];
+	char m_sdRelPos_x[100];
+	char m_sdRelPos_y[100];
+	char m_sdRelPos_z[100];
+	char m_sdAbsPos_x[100];
+	char m_sdAbsPos_y[100];
+	char m_sdAbsPos_z[100];
+	char m_sdMacPos_x[100];
+	char m_sdMacPos_y[100];
+	char m_sdMacPos_z[100];
+	char m_sdRemPos_x[100];
+	char m_sdRemPos_y[100];
+	char m_sdRemPos_z[100];
+	char m_snCycleTime[100];
+	char m_snFinishPartsNum[100];
+	char m_snTotalMachiningTime[100];
+	char m_snTotalPowerOnTime[100];
+	char m_snCncStatus[100];
+	char m_sProgramStatus[100];
+	char m_sCncMode[100];
+    char m_sAxisNamex[100];
+    char m_sAxisNamey[100];
+    char m_sAxisNamez[100];
+    char m_sCurProgramNo[100];
+    char m_sAlarmType[100];
+    char m_sAlarmCode[100];
+    char m_sAlarmMsg[100];
+	char m_sAlarmNumber[100];
+}melsec_cnc_data;
 
-Si_CNC_Data Si_CNC_data;
+melsec_cnc_data melsec_cnc_data_t;
 
 char ABC_Digit[62]={"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"};
 
@@ -154,889 +200,434 @@ unsigned char * AnalyzeRevData(unsigned char* data,unsigned int *data32)
 	return data;
 }
 
-char Si_CNC_Analyze_Ver(unsigned char* data)
-{
-	int k = 0;
-	int len = 0;
-	int point = 0;
-	if(data[12] == 0x0f)
-	{
-		len = 0;
-		point = 20;
-		if ((data[point + 1] == 0xff) && (data[point + 2] == 0x09))
-		{
-			len = data[point + 4];
-			for (k = 0; k < len; k++)
-			{
-				if (data[k + point + 5] == 0x00) break;
-				Si_CNC_data.m_strVer1[k] = data[k + point + 5];
-			}
-			Si_CNC_data.m_strVer1[k]= 0x3B;
-			Si_CNC_data.m_strVer1[k+1]= 0x00;
-			zlg_debug("m_strVer1=%s\r\n",Si_CNC_data.m_strVer1);
-		}
-		point += 4;
-		point += len;
-		if ((data[point + 1] == 0xff) && (data[point + 2] == 0x09))
-		{
-			len = data[point + 4];
-			for (k = 0; k < len; k++)
-			{
-				if (data[k + point + 5] == 0x00) break;
-				Si_CNC_data.m_strVer2[k]= data[k + point + 5];
-			}
-			Si_CNC_data.m_strVer2[k]= 0x3B;
-			Si_CNC_data.m_strVer2[k+1] = 0x00;
-			zlg_debug("m_strVer2=%s\r\n",Si_CNC_data.m_strVer2);
-		}
-		point += 4;
-		point += len;
-		if ((data[point + 1] == 0xff) && (data[point + 2] == 0x09))
-		{
-			len = data[point + 4];
-			for (k = 0; k < len; k++)
-			{
-				if (data[k + point + 5] == 0x00) break;
-				Si_CNC_data.m_strVer3[k]= data[k + point + 5];
-			}
-			Si_CNC_data.m_strVer3[k]= 0x3B;
-			Si_CNC_data.m_strVer3[k+1] = 0x00;
-			zlg_debug("m_strVer3=%s\r\n",Si_CNC_data.m_strVer3);
-		}
-		point += 4;
-		point += len;
-		if ((data[point + 1] == 0xff) && (data[point + 2] == 0x09))
-		{
-			len = data[point + 4];
-			for (k = 0; k < len; k++)
-			{
-				if (data[k + point + 5] == 0x00) break;
-				Si_CNC_data.m_strVer4[k]= data[k + point + 5];
-			}
-			Si_CNC_data.m_strVer4[k]= 0x3B;
-			Si_CNC_data.m_strVer4[k+1] = 0x00;
-			zlg_debug("m_strVer4=%s\r\n",Si_CNC_data.m_strVer4);
-		}
-		point += 4;
-		point += len;
-		if ((data[point + 1] == 0xff) && (data[point + 2] == 0x09))
-		{
-			len = data[point + 4];
-			for (k = 0; k < len; k++)
-			{
-				if ((data[k + point + 5] == 0x74) || (data[k + point + 5] == 0x54))
-				{
-					Si_CNC_data.m_MachineMode = 0;	  //T
-				}
-				else
-				{
-					Si_CNC_data.m_MachineMode = 1;	  //M
-				}
-				if (data[k + point + 5] == 0x00) break;
-				Si_CNC_data.m_strVer5[k]= data[k + point + 5];
-			}
-			//GetDlgItem(IDC_EDIT_VER3)->SetWindowText(m_strVer5);
-			Si_CNC_data.m_strVer5[k]= 0x3B;
-			Si_CNC_data.m_strVer5[k+1]= 0x00;
-			zlg_debug("m_strVer5=%s\r\n",Si_CNC_data.m_strVer5);
-		}
-		return 0;
-	}
-	else return 1;
-}
 
-char Si_CNC_Analyze_Axis_Name(unsigned char* data)
-{
-	int k = 0;
-	if ((data[3] == 0x59) && (data[12] == 0x30))
-	{
-		if (data[25] != 0x00)       //NAME1
-		{
-			for (k = 0; k<5; k++)
-			{
-				if (data[k + 25] != 0x00)
-				{
-					Si_CNC_data.m_sAxisName1[k] = data[k + 25];
-				}
-				else break;
-			}
-			Si_CNC_data.m_sAxisName1[k] = 0x3B;
-			Si_CNC_data.m_sAxisName1[k+1] = 0x00;
-			zlg_debug("m_sAxisName1=%s\r\n",Si_CNC_data.m_sAxisName1);			
-		}
-		if (data[41] != 0x00)      //NAME2
-		{
-			for (k = 0; k<5; k++)
-			{
-				if (data[k + 41] != 0x00)
-				{
-					Si_CNC_data.m_sAxisName2[k] = data[k + 41];
-				}
-				else break;
-			}
-			Si_CNC_data.m_sAxisName2[k] = 0x3B;
-			Si_CNC_data.m_sAxisName2[k+1] = 0x00;
-			zlg_debug("m_sAxisName2=%s\r\n",Si_CNC_data.m_sAxisName2);	
-		}
-		if (data[57] != 0x00)      //NAME3
-		{
-			for (k = 0; k<5; k++)
-			{
-				if (data[k + 57] != 0x00)
-				{
-					Si_CNC_data.m_sAxisName3[k] = data[k + 57];
-				}
-				else break;
-			}
-			Si_CNC_data.m_sAxisName3[k] = 0x3B;
-			Si_CNC_data.m_sAxisName3[k+1] = 0x00;
-			zlg_debug("m_sAxisName3=%s\r\n",Si_CNC_data.m_sAxisName3);			
-		}
-		/*	else if((data[57]!=0x00)&&(data[58]!=0x00))   //SP
-		{
-		//	spindles_info[0].Name[0]=data[57];
-		//spindles_info[0].Name[1]=data[58];
-		}
-		if((data[73]!=0x00)&&(data[74]==0x00))       //
-		{
-		}
-		else if((data[73]!=0x00)&&(data[74]!=0x00))   //?锟斤拷?锟斤拷??3?
-		{
-		spindles_info[0].Name[0]=data[73];
-		spindles_info[0].Name[1]=data[74];
-		}
-		*/
-		return 0;
-	}
-	else return 1;
-}
-
-char Si_CNC_Analyze_Oprate(unsigned char* data)
-{
-	if ((data[3] == 0x21) && (data[12] == 0x0b))
-	{
-		if (data[24] == 0x02)
-		{
-			if (data[31] == 0x00)
-			{
-				Si_CNC_data.m_OpMode = data[25];    //0  JOG  1  mda  2 auto  3 ref
-				if (Si_CNC_data.m_OpMode == 0)
-					sprintf(Si_CNC_data.m_strOprate,"%s;","0");
-				if (Si_CNC_data.m_OpMode == 1)
-					sprintf(Si_CNC_data.m_strOprate,"%s;","1");
-				if (Si_CNC_data.m_OpMode == 2)
-					sprintf(Si_CNC_data.m_strOprate,"%s;","2");
-			}
-			else if (data[31] == 0x03)
-			{
-				Si_CNC_data.m_OpMode = 3;   //REF
-				sprintf(Si_CNC_data.m_strOprate,"%s;","3");
-			}
-		}
-		zlg_debug("Si_CNC_data.m_strOprate:%s\r\n",Si_CNC_data.m_strOprate);
-		return 0;
-	}
-	else return 1;
-}
-
-char Si_CNC_Analyze_CycStart(unsigned char* data)
-{
-	if ((data[3] == 0x21) && (data[12] == 0x0c))
-	{
-		if (data[24] == 0x02)
-		{
-			if (data[25] == 0x00)
-			{
-				Si_CNC_data.m_iState = 0;
-				sprintf(Si_CNC_data.m_strState,"%s;","0");//0  RES
-			}  //RES
-			if ((data[25] == 0x02) && ((data[31] == 0x02) || (data[31] == 0x01)|| (data[31] == 0x05))) { Si_CNC_data.m_iState = 1;  sprintf(Si_CNC_data.m_strState,"%s;","1");} //HOLD 2 2  press hold key    2  1  alarm hold
-			if ((data[25] == 0x01) && (data[31] == 0x03)) { Si_CNC_data.m_iState = 2;   sprintf(Si_CNC_data.m_strState,"%s;","2");} //CYC_START
-			if ((data[25] == 0x01) && (data[31] == 0x05)) { Si_CNC_data.m_iState = 3;   sprintf(Si_CNC_data.m_strState,"%s;","3");} //CYC_STOP
-			if (Si_CNC_data.m_nCycleNum == 2)
-			{
-				//get template status
-				if (Si_CNC_data.m_iState == 0)
-				{
-					Si_CNC_data.m_nStatusCh2 = 2;
-				}
-				else if (Si_CNC_data.m_iState == 1)
-				{
-					Si_CNC_data.m_nStatusCh2 = 2;
-				}
-				else if (Si_CNC_data.m_iState == 2)
-				{
-					Si_CNC_data.m_nStatusCh2 = 1;
-				}
-				else if (Si_CNC_data.m_iState == 3)
-				{
-					Si_CNC_data.m_nStatusCh2 = 2;
-				}
-			}
-			else
-			{
-				//get template status
-				if (Si_CNC_data.m_iState == 0)
-				{
-					Si_CNC_data.m_nStatusCh1 = 2;
-				}
-				else if (Si_CNC_data.m_iState == 1)
-				{
-					Si_CNC_data.m_nStatusCh1 = 2;
-				}
-				else if (Si_CNC_data.m_iState == 2)
-				{
-					Si_CNC_data.m_nStatusCh1 = 1;
-				}
-				else if (Si_CNC_data.m_iState == 3)
-				{
-					Si_CNC_data.m_nStatusCh1 = 2;
-				}
-			}
-			zlg_debug("m_iState = %d, m_strState = %s\r\n", Si_CNC_data.m_iState, Si_CNC_data.m_strState);
-		}
-		return 0;
-	}
-	else return 1;
-}
-
-char Si_CNC_Analyze_AUTOFeed(unsigned char* data)
-{
-	union {
-		unsigned char b[8];
-		double v;
-	}d;
-	int k = 0;
-	if ((data[3] == 0x39) && (data[12] == 0x09))     //FEED_ACT  FEE_SET  FEED_RATE
-	{
-		if (data[24] == 0x08)
-		{
-			d.v = 0;
-			for (k = 0; k < 8; k++)
-				d.b[k] = data[25 + k];
-			if (Si_CNC_data.m_OpMode != 0)//锟斤拷?锟斤拷??锟斤拷
-			{
-				Si_CNC_data.m_dFAct = d.v;
-				sprintf(Si_CNC_data.m_strFeedAct,"%3.3f;",d.v);
-				//GetDlgItem(IDC_EDIT_FEEDSET)->SetWindowText(m_strFeedAct);
-				zlg_debug("m_strFeedAct = %s\r\n", Si_CNC_data.m_strFeedAct);
-			}
-		}
-		if (data[36] == 0x08)
-		{
-			d.v = 0;
-			for (k = 0; k < 8; k++)
-				d.b[k] = data[37 + k];
-			if (Si_CNC_data.m_OpMode != 0)// 
-			{
-				sprintf(Si_CNC_data.m_strFeedSet,"%3.3f;",d.v);
-				Si_CNC_data.m_dFCmd = d.v;
-				//GetDlgItem(IDC_EDIT_FEEDACT)->SetWindowText(m_strFeedSet);
-				zlg_debug("m_strFeedSet = %s\r\n", Si_CNC_data.m_strFeedSet);
-			}
-		}
-		if (data[48] == 0x08)
-		{
-			d.v = 0;
-			for (k = 0; k < 8; k++)
-				d.b[k] = data[49 + k];
-			if (Si_CNC_data.m_OpMode != 0)
-			{
-				sprintf(Si_CNC_data.m_strFeedRate,"%3.3f;",d.v);
-				Si_CNC_data.m_dFOvr = d.v;
-				//GetDlgItem(IDC_EDIT_FEEDRATE)->SetWindowText(m_strFeedRate);
-				zlg_debug("m_strFeedRate = %s\r\n", Si_CNC_data.m_strFeedRate);
-			}
-		}
-		return 0;
-	}
-	else return 1;
-}
-
-char Si_CNC_Analyze_S_Data(unsigned char* data)
-{
-	int k = 0;
-	union {
-		unsigned char b[8];
-		double v;
-	}d;
-	if ((data[3] == 0x39) && (data[12] == 0x0a))             //S_ACT  S_SET  S_RATE
-	{
-		if (data[24] == 0x08)
-		{
-			d.v = 0;
-			for (k = 0; k < 8; k++)
-				d.b[k] = data[25 + k];
-			sprintf(Si_CNC_data.m_strSAct,"%3.3f;",d.v);
-			Si_CNC_data.m_dSAct = d.v;
-			zlg_debug("m_strSAct = %s\r\n", Si_CNC_data.m_strSAct);
-		}
-		if (data[36] == 0x08)
-		{
-			d.v = 0;
-			for (k = 0; k < 8; k++)
-				d.b[k] = data[37 + k];
-			Si_CNC_data.m_dSCmd = d.v;
-			sprintf(Si_CNC_data.m_strSSet,"%3.3f;",d.v);
-			zlg_debug("m_strSSet = %s\r\n",Si_CNC_data.m_strSSet);
-		}
-		if (data[48] == 0x08)
-		{
-			d.v = 0;
-			for (k = 0; k < 8; k++)
-				d.b[k] = data[49 + k];
-			Si_CNC_data.m_dSOvr = d.v;
-			sprintf(Si_CNC_data.m_strSRate,"%3.3f;",d.v);
-			zlg_debug("m_strSRate = %s\r\n", Si_CNC_data.m_strSRate);
-		}
-		return 0;
-	}
-	else return 1;
-}
-
-
-char Si_CNC_Analyze_once_axis(unsigned char* data)
-{
-	int i,k =0;
-		union {
-		unsigned char b[8];
-		double v;
-	}d;
-	if ((data[3] == 0x75) && (data[12] == 0x0e))
-	{
-		i = 21;
-		for (k = 0; k < 8; k++)
-		{
-			if ((data[i] == 0xff) && (data[i + 1] == 0x09))
-			{
-				d.v = 0;
-				d.b[0] = data[i + 4];
-				d.b[1] = data[i + 5];
-				d.b[2] = data[i + 6];
-				d.b[3] = data[i + 7];
-				d.b[4] = data[i + 8];
-				d.b[5] = data[i + 9];
-				d.b[6] = data[i + 10];
-				d.b[7] = data[i + 11];
-				if (k == 0)
-				{
-					sprintf(Si_CNC_data.m_strMx1,"%lf;",d.v);
-					////GetDlgItem(IDC_EDIT_MX1)->SetWindowText(m_strMx1);
-					Si_CNC_data.m_dMacPos_x = d.v;
-					zlg_debug("m_strMx1 = %s\r\n", Si_CNC_data.m_strMx1);
-				}
-				else if (k == 1)
-				{
-					if (Si_CNC_data.m_MachineMode == 0)//T
-					{
-						sprintf(Si_CNC_data.m_strMz1,"%lf;",d.v);
-						Si_CNC_data.m_dMacPos_z = d.v;
-						zlg_debug("m_strMz1 = %s\r\n", Si_CNC_data.m_strMz1);
-					}
-					else  //
-					{
-						sprintf(Si_CNC_data.m_strMy1,"%lf;",d.v);
-						Si_CNC_data.m_dMacPos_y = d.v;
-						zlg_debug("m_strMy1 = %s\r\n", Si_CNC_data.m_strMy1);
-					}
-				}
-				else if (k == 2)
-				{
-					if (Si_CNC_data.m_MachineMode == 1)  //M
-					{
-						sprintf(Si_CNC_data.m_strMz1,"%lf;",d.v);
-						Si_CNC_data.m_dMacPos_z = d.v;
-						zlg_debug("m_strMz1 = %s\r\n", Si_CNC_data.m_strMz1);
-					}
-				}
-				else if (k == 3)
-				{
-				}
-				else if (k == 4)
-				{
-					sprintf(Si_CNC_data.m_strDisX,"%lf;",d.v);
-					Si_CNC_data.m_dRemPos_x = d.v;
-					zlg_debug("m_strDisX = %s\r\n", Si_CNC_data.m_strDisX);
-				}
-				else if (k == 5)
-				{
-					if (Si_CNC_data.m_MachineMode == 0)//T
-					{
-						sprintf(Si_CNC_data.m_strDisZ,"%lf;",d.v);
-						Si_CNC_data.m_dRemPos_z = d.v;
-						zlg_debug("m_strDisZ = %s\r\n", Si_CNC_data.m_strDisZ);
-					}
-					else  //
-					{
-						sprintf(Si_CNC_data.m_strDisY,"%lf;",d.v);
-						Si_CNC_data.m_dRemPos_y = d.v;
-						zlg_debug("m_strDisY = %s\r\n", Si_CNC_data.m_strDisY);
-					}
-				}
-				else if (k == 6)
-				{
-					if (Si_CNC_data.m_MachineMode == 1)  //M
-					{
-						sprintf(Si_CNC_data.m_strDisZ,"%lf;",d.v);
-						Si_CNC_data.m_dRemPos_z = d.v;
-						zlg_debug("m_strDisZ = %s\r\n", Si_CNC_data.m_strDisZ);
-					}
-				}
-				else if (k == 7)
-				{
-				}
-			}
-			i += 12;
-		}//for
-		return 0;
-	}
-	else return 1;
-}
-
-char Si_CNC_Analyze_Work_Axis(unsigned char* data)
-{
-	int i,k=0;
-	union {
-		unsigned char b[8];
-		double v;
-	}d;
-	if ((data[3] == 0x45) && (data[12] == 0x14))
-	{
-		i = 21;
-		for (k = 0; k < 4; k++)
-		{
-			if ((data[i] == 0xff) && (data[i + 1] == 0x09))
-			{
-				d.v = 0;
-				d.b[0] = data[i + 4];
-				d.b[1] = data[i + 5];
-				d.b[2] = data[i + 6];
-				d.b[3] = data[i + 7];
-				d.b[4] = data[i + 8];
-				d.b[5] = data[i + 9];
-				d.b[6] = data[i + 10];
-				d.b[7] = data[i + 11];
-				if (k == 0)
-				{
-					sprintf(Si_CNC_data.m_strWorkX,"%lf;",d.v);
-					Si_CNC_data.m_dAbsPos_x = d.v;
-					zlg_debug("m_strWorkX = %s\r\n", Si_CNC_data.m_strWorkX);
-				}
-				else if (k == 1)
-				{
-					if (Si_CNC_data.m_MachineMode == 0)//T
-					{
-						sprintf(Si_CNC_data.m_strWorkZ,"%lf;",d.v);
-						Si_CNC_data.m_dAbsPos_z = d.v;
-						zlg_debug("m_strWorkZ = %s\r\n", Si_CNC_data.m_strWorkZ);
-					}
-					else  //
-					{
-						sprintf(Si_CNC_data.m_strWorkY,"%lf;",d.v);
-						Si_CNC_data.m_dAbsPos_y = d.v;
-						zlg_debug("m_strWorkY = %s\r\n", Si_CNC_data.m_strWorkY);
-					}
-				}
-				else if (k == 2)
-				{
-					if (Si_CNC_data.m_MachineMode == 1)  //M
-					{
-						sprintf(Si_CNC_data.m_strWorkZ,"%lf;",d.v);
-						Si_CNC_data.m_dAbsPos_z = d.v;
-						zlg_debug("m_strWorkZ = %s\r\n", Si_CNC_data.m_strWorkZ);
-					}
-				}
-				else if (k == 3)
-				{
-				}
-			}
-			i += 12;
-		}//for
-		return 0;
-	}
-	else return 1;
-}
-
-char Si_CNC_Analyze_ToolComp(unsigned char* data)
-{
-	union {
-		unsigned char b[8];
-		double v;
-	}d;
-	union {
-		unsigned char b[4];
-		long va;
-	}l_int;
-	int i,k,j=0;
-	if (((data[3] == 0x4d)||(data[3] == 0x49)) && (data[12] == 0x15))
-	{
-		// if(data[12]==0x015) TOOLCOMP_seqence_number=data[24];
-		//  	int i=35;
-		i = 21;
-		for (k = 0; k < 4; k++)
-		{
-			if ((data[i] == 0xff) && (data[i + 1] == 0x09))
-			{
-				d.v = 0.000000;
-				d.b[0] = data[i + 4];
-				d.b[1] = data[i + 5];
-				d.b[2] = data[i + 6];
-				d.b[3] = data[i + 7];
-				d.b[4] = data[i + 8];
-				d.b[5] = data[i + 9];
-				d.b[6] = data[i + 10];
-				d.b[7] = data[i + 11];
-			}
-			if (k == 0)
-			{
-				sprintf(Si_CNC_data.m_strToolLengthX,"%lf;",d.v);
-				//GetDlgItem(IDC_EDIT_TOOLLENGTHX)->SetWindowText(m_strToolLengthX);
-				zlg_debug("m_strToolLengthX = %s\r\n", Si_CNC_data.m_strToolLengthX);
-			}
-			else if (k == 1)
-			{
-				sprintf(Si_CNC_data.m_strToolLengthZ,"%lf;",d.v);
-				//GetDlgItem(IDC_EDIT_TOOLLENGTHZ)->SetWindowText(m_strToolLengthZ);
-				zlg_debug("m_strToolLengthZ = %lf\r\n",d.v);
-				zlg_debug("m_strToolLengthZ = %s\r\n", Si_CNC_data.m_strToolLengthZ);
-			}
-			else if (k == 2)
-			{
-				sprintf(Si_CNC_data.m_strTooledg,"%lf;",d.v);
-				//GetDlgItem(IDC_EDIT_TOOLEDG)->SetWindowText(m_strTooledg);
-				zlg_debug("m_strTooledg = %s\r\n", Si_CNC_data.m_strTooledg);
-			}
-			else if (k == 3)
-			{
-				sprintf(Si_CNC_data.m_strToolRadiu,"%lf;",d.v);
-				//GetDlgItem(IDC_EDIT_TOOLRADIU)->SetWindowText(m_strToolRadiu);
-				zlg_debug("m_strToolRadiu = %s\r\n", Si_CNC_data.m_strToolRadiu);
-			}
-			i += 12;
-		}//for
-		if ((data[i] == 0xff) && (data[i + 1] == 0x09) && (data[i + 3] == 0x04))
-		{
-			l_int.va = 0;
-			l_int.b[0] = data[i + 4];
-			l_int.b[1] = data[i + 5];
-			l_int.b[2] = data[i + 6];
-			l_int.b[3] = data[i + 7];
-			sprintf(Si_CNC_data.m_strHnum,"%ld;",l_int.va);
-			////GetDlgItem(IDC_EDIT_HNUMBER)->SetWindowText(m_strHnum);
-			zlg_debug("m_strHnum = %s\r\n", Si_CNC_data.m_strHnum);
-		}
-		return 0;
-	}
-	else return 1;
-}
-
-char Si_CNC_Analyze_TDnumber(unsigned char* data)
-{
-	union {
-		unsigned char b[2];
-		int v;
-	}iv;
-	if ((data[3] == 0x21) && (data[12] == 0x08))      //T  D
-	{
-		if (data[21] == 0xff)
-		{
-			iv.v = 0;
-			iv.b[0] = data[25];
-			iv.b[1] = data[26];
-			sprintf(Si_CNC_data.m_strTno,"%d;",iv.v);
-			////GetDlgItem(IDC_EDIT_TOOLNUMBER)->SetWindowText(m_strTno);
-			zlg_debug("m_strTno = %s\r\n", Si_CNC_data.m_strTno);
-			iv.v = 0;
-			iv.b[0] = data[31];
-			iv.b[1] = data[32];
-			sprintf(Si_CNC_data.m_strDno,"%d;",iv.v);
-			////GetDlgItem(IDC_EDIT_DNUMBER)->SetWindowText(m_strDno);
-			zlg_debug("m_strDno = %s\r\n", Si_CNC_data.m_strDno);
-		}
-		return 0;
-	}
-	else return 1;
-}
-
-char Si_CNC_Analyze_JOG_FEEDRATE(unsigned char* data)
-{
-	int k=0;
-	union {
-		unsigned char b[8];
-		double v;
-	}d;
-	if ((data[3] == 0x39) && ((data[12] == 0x09)||(data[12] == 0x07)))     //FEED_ACT  FEE_SET  FEED_RATE
-	{
-		if (data[24] == 0x08)
-		{
-			d.v = 0;
-			for (k = 0; k < 8; k++)
-				d.b[k] = data[25 + k];
-			if (Si_CNC_data.m_OpMode != 0)//锟斤拷?锟斤拷??锟斤拷
-			{
-				Si_CNC_data.m_dFAct = d.v;
-				sprintf(Si_CNC_data.m_strFeedAct,"%3.3f;", d.v);
-				//GetDlgItem(IDC_EDIT_FEEDSET)->SetWindowText(m_strFeedAct);
-				zlg_debug("m_strFeedAct = %s\r\n", Si_CNC_data.m_strFeedAct);
-			}
-		}
-		if (data[36] == 0x08)
-		{
-			d.v = 0;
-			for (k = 0; k < 8; k++)
-				d.b[k] = data[37 + k];
-			if (Si_CNC_data.m_OpMode != 0)// 
-			{
-				sprintf(Si_CNC_data.m_strFeedSet,"%3.3f", d.v);
-				Si_CNC_data.m_dFCmd = d.v;
-				//GetDlgItem(IDC_EDIT_FEEDACT)->SetWindowText(m_strFeedSet);
-				zlg_debug("m_strFeedSet = %s\r\n", Si_CNC_data.m_strFeedSet);
-			}
-		}
-		if (data[48] == 0x08)
-		{
-			d.v = 0;
-			for (k = 0; k < 8; k++)
-				d.b[k] = data[49 + k];
-			if (Si_CNC_data.m_OpMode != 0)
-			{
-				sprintf(Si_CNC_data.m_strFeedRate,"%3.3f", d.v);
-				Si_CNC_data.m_dFOvr = d.v;
-				//GetDlgItem(IDC_EDIT_FEEDRATE)->SetWindowText(m_strFeedRate);
-				zlg_debug("m_strFeedRate = %s\r\n", Si_CNC_data.m_dFOvr);
-			}
-		}
-		return 0;
-	}
-	else return 1;
-}
-
-char Si_CNC_Analyze_ProcessName(unsigned char* data)
-{
-	int f = 0;
-	int g = 0;
-	int i,j= 0;
-	if ((data[3] == 0xb9) && (data[12] == 0x12))
-	{
-		if ((data[21] == 0xff) && (data[22] == 0x09))
-		{
-			f = 0; 
-			g = 0;
-			i = 25; 
-			memset(Si_CNC_data.m_strProcessName,0,sizeof(Si_CNC_data.m_strProcessName));
-			/* while ((data[i] != 0x00) && (i < data[3]))
-			{
-				m_strProcessName += data[i];
-				i++;
-			} */
-			while ((data[i] != 0x00) && (i < data[3]))
-			{
-				if (f > 0)
-				{
-					if (g == 2)
-					{
-						Si_CNC_data.m_strProcessName[j++]= data[i];
-						Si_CNC_data.m_strProcessName[j]= 0x3B;
-						Si_CNC_data.m_strProcessName[j+1]= 0x00;
-					}
-					if ((data[i] == 0x5F) && (g< 2))
-					{
-						g++;
-					}
-				}
-				if (data[i] == 0x2F)
-				{
-					f++;
-					//sprintf(Si_CNC_data.m_strProcessName,"%c","");
-					//memset(Si_CNC_data.m_strProcessName,0,100);
-					zlg_debug("Si_CNC_data.m_strProcessName %d =%s\r\n",i,Si_CNC_data.m_strProcessName);
-					g = 0;
-					j=0;
-				}
-				i++;
-			}
-			//sprintf(Si_CNC_data.m_sCurProgramNo,"%s",Si_CNC_data.m_strProcessName);
-			//GetDlgItem(IDC_EDIT_PROCESSNAME)->SetWindowText(m_strProcessName);
-			zlg_debug("m_strProcessName = %s\r\n", Si_CNC_data.m_strProcessName);
-		}
-		return 0;
-	}
-	else return 1;
-}
-
-char Si_CNC_Piece_Time(unsigned char* data)
-{
-	int i,k=0;
-	union {
-		unsigned char b[8];
-		double v;
-	}d;
-	if ((data[3] == 0x45) && (data[12] == 0x11))
-	{	
-		i = 21;
-		for (k = 0; k < 4; k++)
-		{
-			if ((data[i] == 0xff) && (data[i + 1] == 0x09))
-			{
-				float tempf;
-				d.v = 0;
-				d.b[0] = data[i + 4];
-				d.b[1] = data[i + 5];
-				d.b[2] = data[i + 6];
-				d.b[3] = data[i + 7];
-				d.b[4] = data[i + 8];
-				d.b[5] = data[i + 9];
-				d.b[6] = data[i + 10];
-				d.b[7] = data[i + 11];
-				if (k == 0)
-				{
-					sprintf(Si_CNC_data.m_strProAct,"%3.3lf;",d.v);
-					Si_CNC_data.m_nCycleTime = d.v;
-					sprintf(Si_CNC_data.m_ncycleTime,"%d;",Si_CNC_data.m_nCycleTime);
-					tempf = d.v;
-					zlg_debug("m_nCycleTime = %s\r\n", Si_CNC_data.m_ncycleTime);
-					zlg_debug("m_strProAct = %s\r\n", Si_CNC_data.m_strProAct);
-				}
-				if (k == 1)
-				{
-					sprintf(Si_CNC_data.m_strProLeft,"%3.3lf;",(d.v - tempf));
-					//GetDlgItem(IDC_EDIT_PRO_LEFT)->SetWindowText(m_strProLeft);
-					zlg_debug("m_strProLeft = %s\r\n", Si_CNC_data.m_strProLeft);
-				}
-				if (k == 2)
-				{
-					sprintf(Si_CNC_data.m_strPicAct,"%3.0lf;", d.v);
-					Si_CNC_data.m_nFinishPartsNum = d.v;
-					//GetDlgItem(IDC_EDIT_PIC_ACT)->SetWindowText(m_strPicAct);
-					zlg_debug("m_strPicAct = %s\r\n", Si_CNC_data.m_strPicAct);
-				}
-				if (k == 3)
-				{
-					sprintf(Si_CNC_data.m_strPicReq,"%3.0lf;", d.v);
-					//GetDlgItem(IDC_EDIT_PIC_REQ)->SetWindowText(m_strPicReq);
-					zlg_debug("mm_strPicReq = %s\r\n", Si_CNC_data.m_strPicReq);
-				}
-			}
-			i += 12;
-		} //for
-		return 0; 
-	}
-	else return 1;
-}
-
-char Si_CNC_AlarmNo(unsigned char* data)
-{
-	union {
-		unsigned char b[2];
-		int v;
-	}iv;
-	if ((data[3] == 0xc3) && ((data[12] == 0x10) || ((data[24] == Si_CNC_data.ALARM_seqence_number) && (Si_CNC_data.ALARM_seqence_number != 0))))
-	{
-
-		if (data[12] == 0x10) Si_CNC_data.ALARM_seqence_number = data[24];
-		if ((data[35] == 0xff) && (data[36] == 0x09))  //锟斤拷锟斤拷锟斤拷
-		{
-			if (data[187] == 0x01)  // No reset alarm
-			{
-				iv.v = 0;
-				iv.b[0] = data[39];
-				iv.b[1] = data[40];
-				sprintf(Si_CNC_data.m_strAlarmNo,"%d;", iv.v);
-
-				zlg_debug("m_strAlarmNo = %s\r\n", Si_CNC_data.m_strAlarmNo);
-				if (iv.v != 0)
-				{
-					sprintf(Si_CNC_data.m_strAlarmTime,"%2x:%2x;", data[54], data[55]);
-					//GetDlgItem(IDC_EDIT_ALARMTIME)->SetWindowText(m_strAlarmTime);
-					zlg_debug("m_strAlarmTime = %s\r\n", Si_CNC_data.m_strAlarmTime);
-
-					//m_pCollectConfig->m_pTemplate->m_nAlarmNum = 1;
-					//Alarm al;
-					//al.m_sCode = m_strAlarmNo;
-					//m_pCollectConfig->m_pTemplate->m_vItemsAlarm.push_back(al);
-				}
-			}
-			else
-			{
-				sprintf(Si_CNC_data.m_strAlarmNo,"%d;", 0);
-				zlg_debug("m_strAlarmNo = %s\r\n", Si_CNC_data.m_strAlarmNo);
-				sprintf(Si_CNC_data.m_strAlarmTime,"%s;","    ");
-				zlg_debug("m_strAlarmTime = %s\r\n", Si_CNC_data.m_strAlarmTime);
-			}
-		}
-		return 0;
-	}
-	else return 1;
-}
-char Si_CNC_end_collect(unsigned char* data)
-{
-	return 0;
-}
 
 void pack_analyze_result(void)
 {
-	strcat(result,Si_CNC_data.m_strState); //状态
-	strcat(result,Si_CNC_data.m_strOprate);//模式
-	strcat(result,Si_CNC_data.m_strVer5);
-	strcat(result,Si_CNC_data.m_sAxisName1);
-	strcat(result,Si_CNC_data.m_sAxisName2);
-	strcat(result,Si_CNC_data.m_sAxisName3);
-	strcat(result,Si_CNC_data.m_strToolLengthX);
-	strcat(result,Si_CNC_data.m_strToolLengthZ);
-	strcat(result,Si_CNC_data.m_strTooledg);
-	strcat(result,Si_CNC_data.m_strToolRadiu);
-	strcat(result,Si_CNC_data.m_strFeedAct);//实际进给量
-	strcat(result,Si_CNC_data.m_strFeedSet);//设置进给量
-	strcat(result,Si_CNC_data.m_strFeedRate);//进给倍率
-	strcat(result,Si_CNC_data.m_strSAct);//
-	strcat(result,Si_CNC_data.m_strSSet);//
-	strcat(result,Si_CNC_data.m_strSRate);//
-	strcat(result,Si_CNC_data.m_strMx1);//MacPos_x
-	strcat(result,Si_CNC_data.m_strMy1);//MacPos_y
-	strcat(result,Si_CNC_data.m_strMz1);//MacPos_z
-	strcat(result,Si_CNC_data.m_strDisX);//
-	strcat(result,Si_CNC_data.m_strDisY);//
-	strcat(result,Si_CNC_data.m_strDisZ);//
-	strcat(result,Si_CNC_data.m_strWorkX);//绝对坐标x
-	strcat(result,Si_CNC_data.m_strWorkY);//绝对坐标y
-	strcat(result,Si_CNC_data.m_strWorkZ);//绝对坐标z
-	strcat(result,Si_CNC_data.m_ncycleTime);//循环时间
-	strcat(result,Si_CNC_data.m_strTno);
-	strcat(result,Si_CNC_data.m_strDno);	
-	strcat(result,Si_CNC_data.m_strProAct);
-	strcat(result,Si_CNC_data.m_strProLeft);
-	strcat(result,Si_CNC_data.m_strPicAct);//产量
-	strcat(result,Si_CNC_data.m_strPicReq);		
-	strcat(result,Si_CNC_data.m_strProcessName);	
-	//strcat(result,Si_CNC_data.m_strAlarmNo);
-	//zlg_debug("---%s\r\n",result);
+	strcat(result,melsec_cnc_data_t.m_sAlarmNumber);
+	strcat(result,melsec_cnc_data_t.m_sAlarmCode);
+	strcat(result,melsec_cnc_data_t.m_sAlarmMsg);
+	strcat(result,melsec_cnc_data_t.m_sAlarmType);
+	strcat(result,melsec_cnc_data_t.m_sCncMode);
+	strcat(result,melsec_cnc_data_t.m_snCncStatus);
+	strcat(result,melsec_cnc_data_t.m_sCurProgramBlockNo);
+	strcat(result,melsec_cnc_data_t.m_sCurProgramNo);
+	strcat(result,melsec_cnc_data_t.m_snCycleTime);
+	strcat(result,melsec_cnc_data_t.m_sdFeedOverride);
+	strcat(result,melsec_cnc_data_t.m_sFeedrate);
+	strcat(result,melsec_cnc_data_t.m_snFinishPartsNum);
+	strcat(result,melsec_cnc_data_t.m_sProgramStatus);
+	strcat(result,melsec_cnc_data_t.m_sdAbsPos_x);
+	strcat(result,melsec_cnc_data_t.m_sdLoad_x);
+	strcat(result,melsec_cnc_data_t.m_sdMacPos_x);
+	strcat(result,melsec_cnc_data_t.m_sAxisNamex);
+	strcat(result,melsec_cnc_data_t.m_sdRelPos_x);
+	strcat(result,melsec_cnc_data_t.m_sdRemPos_x);
+	strcat(result,melsec_cnc_data_t.m_sdAbsPos_y);
+	strcat(result,melsec_cnc_data_t.m_sdLoad_y);
+	strcat(result,melsec_cnc_data_t.m_sdMacPos_y);
+	strcat(result,melsec_cnc_data_t.m_sAxisNamey);
+	strcat(result,melsec_cnc_data_t.m_sdRelPos_y);
+	strcat(result,melsec_cnc_data_t.m_sdRemPos_y);
+	strcat(result,melsec_cnc_data_t.m_sdAbsPos_z);
+	strcat(result,melsec_cnc_data_t.m_sdLoad_z);
+	strcat(result,melsec_cnc_data_t.m_sdMacPos_z);
+	strcat(result,melsec_cnc_data_t.m_sAxisNamez);
+	strcat(result,melsec_cnc_data_t.m_sdRelPos_z);
+	strcat(result,melsec_cnc_data_t.m_sdRemPos_z);
 }
 
-char (*Si_CNC_Data_Analyze[_Collect_Num])(unsigned char* data) ={
-	&Si_CNC_Analyze_CycStart,
-	&Si_CNC_Analyze_Oprate,
-	&Si_CNC_Analyze_Ver,
-	&Si_CNC_Analyze_Axis_Name,
-	&Si_CNC_Analyze_ToolComp,
-//	&Si_CNC_Analyze_CycStart,
-	&Si_CNC_Analyze_AUTOFeed,
-	&Si_CNC_Analyze_S_Data,
-	&Si_CNC_Analyze_once_axis,
-	&Si_CNC_Analyze_Work_Axis,
-	&Si_CNC_Analyze_TDnumber,
-	//&Si_CNC_Analyze_JOG_FEEDRATE,
-	&Si_CNC_Piece_Time,
-	&Si_CNC_Analyze_ProcessName,
-	&Si_CNC_AlarmNo,
-	//&Si_CNC_end_collect,
-};
-
-
-char Si_CNC_AnalyzeData(unsigned char* data,unsigned char index)
+char *deal_with_alarm(const char *m_strtype, const char *m_strcode)
 {
-	int i = 0;
-	if(data[3] == 0x13) return 1;
-	return Si_CNC_Data_Analyze[index](data);
+	int ret = 0;
+	if((strcmp(m_strtype,"M01 "))==0)
+	{
+		{
+			if(strcmp(m_strcode,"0105")==0)  
+				sprintf(err_msg,"%s","主轴停止");
+		}
+	}
+	if((strcmp(m_strtype,"Z40 "))==0)
+	{
+		sprintf(err_msg,"%s","格式不一致");
+	}
+	if((strcmp(m_strtype,"Y51 "))==0)
+	{
+		{
+			if(strcmp(m_strcode,"0002")==0)  
+				sprintf(err_msg,"%s","参数G1tL加减速时间常数异常-2007");
+		}
+	}
+	if((strcmp(m_strtype,"Y06 "))==0)
+		sprintf(err_msg,"%s","mcp_no 设定错误");
+	return err_msg;
+}
+
+int melsec_cnc_analyze_data(unsigned char* data)
+{
+	union{
+		unsigned char b[4];
+		long v;
+	}ID,ID1,ld;
+	union{
+   		unsigned char b[8];
+   		double v;
+   	}d;
+	union{
+    	unsigned char b[2];
+    	int v;
+ 	}iv;
+	char m_strValue[20];
+	double d_value=0;
+	long   l_value=0;
+	int    i_value=0;
+	int    i=0;
+	char *alarm_msg = NULL;
+	if((data[0]==0x47)&&(data[1]==0x49)&&(data[2]==0x4f)&&(data[3]==0x50)&&(data[4]==0x01)&&(data[5]==0x00)&&(data[6]==0x01)&&(data[7]==0x01))
+	{
+		ID.b[0] = data[16];
+		ID.b[1] = data[17];
+		ID.b[2] = data[18];
+		ID.b[3] = data[19];
+		iv.v=0;
+		l_value=0;
+		d_value=0;
+		if((data[28]==0x49)&&(data[29]==0x44)&&(data[30]==0x4c))   //IDL
+			sprintf(m_strValue,"%s","IDL");
+		else if((data[28]==0x01)&&(data[32]==0x01))    //BYTE		 
+			sprintf(m_strValue,"%d",data[36]);		   
+		else if((data[28]==0x02)&&(data[32]==0x02))    //INT
+		{
+			iv.v=0;
+			iv.b[0]=data[36];
+			iv.b[1]=data[37];
+			i_value=iv.v;
+			sprintf(m_strValue,"%ld",i_value);
+		}
+		else if((data[28]==0x03)&&(data[32]==0x04))  //long
+		{
+			ID1.v = 0;
+			ID1.b[0]=data[36];
+			ID1.b[1]=data[37];
+			ID1.b[2]=data[38];
+			ID1.b[3]=data[39];
+			l_value=ID1.v;
+			sprintf(m_strValue,"%ld",l_value);
+		}
+		else if((data[28]==0x05)&&(data[32]==0x08))  //dobule-8
+		{
+			d.v = 0;
+			d.b[0]=data[36];
+			d.b[1]=data[37];
+			d.b[2]=data[38];
+			d.b[3]=data[39];
+			d.b[4]=data[40];
+			d.b[5]=data[41];
+			d.b[6]=data[42];
+			d.b[7]=data[43];
+			d_value=d.v;
+			sprintf(m_strValue,"%lf",d_value);
+		} 
+		else if((data[28]==0x06)&&(data[32]==0x10))  //double-10
+		{
+			d.v = 0;
+			d.b[0]=data[44];
+			d.b[1]=data[45];
+			d.b[2]=data[46];
+			d.b[3]=data[47];
+			d.b[4]=data[48];
+			d.b[5]=data[49];
+			d.b[6]=data[50];
+			d.b[7]=data[51];
+			d_value=d.v;
+			sprintf(m_strValue,"%lf",d_value);
+		}
+		else if((data[28]==0x10))  //CString
+		{
+			for(i=0; i<data[36]; i++)
+			{
+				m_strValue[i] = data[40+i];
+			}
+			m_strValue[i] = 0;
+		}
+		else if((data[28]==0xbc))  //CString-188  
+		{
+			for(i=0; i<data[36]; i++)
+			{
+				m_strValue[i] = data[40+i];
+			}
+			m_strValue[i] = 0;
+		}
+		switch(ID.v)
+		{
+		case ID_RDY_HLD:            
+			{
+				melsec_cnc_data_t.m_nCncStatus =2; 
+				melsec_cnc_data_t.m_ProgramStatus =2; 
+				zlg_debug("CncStatus = %s\r\n", m_strValue);
+				if(strcmp(m_strValue,"AUT") ==0)
+				{
+			       	melsec_cnc_data_t.m_nCncStatus =1; 
+					melsec_cnc_data_t.m_ProgramStatus =1; 
+					sprintf(melsec_cnc_data_t.m_snCncStatus,"%d;",melsec_cnc_data_t.m_nCncStatus);
+					sprintf(melsec_cnc_data_t.m_sProgramStatus,"%d;",melsec_cnc_data_t.m_ProgramStatus);
+				}
+				else if (strcmp(m_strValue,"HLD") ==0)
+				{
+					melsec_cnc_data_t.m_nCncStatus =2; 
+					melsec_cnc_data_t.m_ProgramStatus =3; 
+					sprintf(melsec_cnc_data_t.m_snCncStatus,"%d;",melsec_cnc_data_t.m_nCncStatus);
+					sprintf(melsec_cnc_data_t.m_sProgramStatus,"%d;",melsec_cnc_data_t.m_ProgramStatus);
+				}	
+				zlg_debug("m_snCncStatus = %s\r\n",melsec_cnc_data_t.m_snCncStatus);
+				zlg_debug("m_sProgramStatus = %s\r\n",melsec_cnc_data_t.m_sProgramStatus);		
+				break;
+			}
+		case ID_PROC_MODE:           
+			{
+				sprintf(melsec_cnc_data_t.m_sCncMode,"%s;",m_strValue);
+				zlg_debug("m_sCncMode = %s\r\n",melsec_cnc_data_t.m_sCncMode);
+				break;
+			}
+		case ID_POWER: 
+			{
+				sprintf(melsec_cnc_data_t.m_snTotalPowerOnTime,"%ld;",l_value);
+				zlg_debug("m_snTotalPowerOnTime = %s\r\n",melsec_cnc_data_t.m_snTotalPowerOnTime);
+				break;
+			}
+		case ID_AUTO:  
+			{
+				sprintf(melsec_cnc_data_t.m_snTotalMachiningTime,"%ld;",l_value);
+				zlg_debug("m_snTotalMachiningTime = %s\r\n",melsec_cnc_data_t.m_snTotalMachiningTime);
+				break;
+			}
+		case ID_PROCESS:
+			{
+				sprintf(melsec_cnc_data_t.m_snCycleTime,"%ld;",l_value);
+				zlg_debug("m_snCycleTime = %s\r\n",melsec_cnc_data_t.m_snCycleTime);
+				break;
+			}  	
+		case ID_SERVO_NAME1:   
+			{
+				sprintf(melsec_cnc_data_t.m_sAxisNamex,"%s;",m_strValue);
+				zlg_debug("m_sAxisNamex = %s\r\n",melsec_cnc_data_t.m_sAxisNamex);
+				break;
+			}  	
+		case ID_SERVO_NAME2 :  
+			{
+				sprintf(melsec_cnc_data_t.m_sAxisNamey,"%s;",m_strValue);
+				zlg_debug("m_sAxisNamey = %s\r\n",melsec_cnc_data_t.m_sAxisNamey);
+			  	break;
+			}  
+		case ID_SERVO_NAME3 :  
+			{
+				sprintf(melsec_cnc_data_t.m_sAxisNamez,"%s;",m_strValue);
+				zlg_debug("m_sAxisNamez = %s\r\n",melsec_cnc_data_t.m_sAxisNamez);
+				break;
+			}
+		case ID_POS_CURRENT_X:  
+			{
+				sprintf(melsec_cnc_data_t.m_sdRelPos_x,"%lf;",d_value);
+				zlg_debug("m_sdRelPos_x = %s\r\n",melsec_cnc_data_t.m_sdRelPos_x);
+				break;
+			}
+		case ID_POS_WORK_X:      
+			{
+				sprintf(melsec_cnc_data_t.m_sdAbsPos_x,"%lf;",d_value);
+				zlg_debug("m_sdAbsPos_x = %s\r\n",melsec_cnc_data_t.m_sdAbsPos_x);
+				break;
+			}
+		case ID_POS_MACHINE_X:  
+			{
+				sprintf(melsec_cnc_data_t.m_sdMacPos_x,"%lf;",d_value); 
+				zlg_debug("m_sdMacPos_x = %s\r\n",melsec_cnc_data_t.m_sdMacPos_x);
+				break;
+			}
+		case ID_POS_DIS_X:     
+			{
+				sprintf(melsec_cnc_data_t.m_sdRemPos_x,"%lf;",d_value);
+				zlg_debug("m_sdRemPos_x = %s\r\n",melsec_cnc_data_t.m_sdRemPos_x);
+				break;
+			}
+		case ID_SERVO_LOADX:    
+			{
+				sprintf(melsec_cnc_data_t.m_sdLoad_x,"%ld;",l_value);
+				zlg_debug("m_sdLoad_x = %s\r\n",melsec_cnc_data_t.m_sdLoad_x);
+				break;
+			}  
+		case ID_POS_CURRENT_Y:   
+			{
+				sprintf(melsec_cnc_data_t.m_sdRelPos_y,"%lf;",d_value);
+				zlg_debug("m_sdRelPos_y = %s\r\n",melsec_cnc_data_t.m_sdRelPos_y);
+				break;
+			}
+		case ID_POS_WORK_Y:         
+			{
+				sprintf(melsec_cnc_data_t.m_sdAbsPos_y,"%lf;",d_value);
+				zlg_debug("m_sdAbsPos_y = %s\r\n",melsec_cnc_data_t.m_sdAbsPos_y);
+				break;
+			}
+		case ID_POS_MACHINE_Y:  
+			{
+				sprintf(melsec_cnc_data_t.m_sdMacPos_y,"%lf;",d_value);
+				zlg_debug("m_sdMacPos_y = %s\r\n",melsec_cnc_data_t.m_sdMacPos_y);
+				break;
+			}
+		case ID_POS_DIS_Y:       
+			{
+				sprintf(melsec_cnc_data_t.m_sdRemPos_y,"%lf;",d_value);
+				zlg_debug("m_sdRemPos_y = %s\r\n",melsec_cnc_data_t.m_sdRemPos_y);
+				break;
+			}
+		case ID_SERVO_LOADY:      
+			{
+				sprintf(melsec_cnc_data_t.m_sdLoad_y,"%ld;",l_value);
+				zlg_debug("m_sdLoad_y = %s\r\n",melsec_cnc_data_t.m_sdLoad_y);
+				break;
+			}
+		case ID_POS_CURRENT_Z:   
+			{
+				sprintf(melsec_cnc_data_t.m_sdRelPos_z,"%lf;",d_value);
+				zlg_debug("m_sdRelPos_z = %s\r\n",melsec_cnc_data_t.m_sdRelPos_z);
+				break;
+			}
+		case ID_POS_WORK_Z:          
+			{
+				sprintf(melsec_cnc_data_t.m_sdAbsPos_z,"%lf;",d_value);
+				zlg_debug("m_sdAbsPos_z = %s\r\n",melsec_cnc_data_t.m_sdAbsPos_z);
+				break;
+			}
+		case ID_POS_MACHINE_Z:  
+			{
+				sprintf(melsec_cnc_data_t.m_sdMacPos_z,"%lf;",d_value);
+				zlg_debug("m_sdMacPos_z = %s\r\n",melsec_cnc_data_t.m_sdMacPos_z);
+				break;
+			}
+		case ID_POS_DIS_Z:        
+			{
+				sprintf(melsec_cnc_data_t.m_sdRemPos_z,"%lf;",d_value);
+				zlg_debug("m_sdRemPos_z = %s\r\n",melsec_cnc_data_t.m_sdRemPos_z);
+				break;
+			}
+		case ID_SERVO_LOADZ:        
+			{
+				sprintf(melsec_cnc_data_t.m_sdLoad_z,"%ld;",l_value);
+				zlg_debug("m_sdLoad_z = %s\r\n",melsec_cnc_data_t.m_sdLoad_z);
+				break;
+			} 
+		case ID_SPENDLE_TEMP :       
+			{
+				sprintf(melsec_cnc_data_t.m_sdTemp,"%ld;",l_value);
+				zlg_debug("m_sdTemp = %s\r\n",melsec_cnc_data_t.m_sdTemp);
+				break;
+			}
+		case ID_SPENDLE_LOAD :       
+			{
+				sprintf(melsec_cnc_data_t.m_sdLoad,"%ld;",l_value);
+				zlg_debug("m_sdLoad = %s\r\n",melsec_cnc_data_t.m_sdLoad);
+				break;
+			}
+		case ID_SPENDLE_SPEED:        
+			{
+				sprintf(melsec_cnc_data_t.m_sSpeed,"%lf;",d_value);
+				zlg_debug("m_sSpeed = %s\r\n",melsec_cnc_data_t.m_sSpeed);
+				break;
+			}
+		case ID8002N:         
+			{
+				sprintf(melsec_cnc_data_t.m_snFinishPartsNum,"%s;",m_strValue);
+				zlg_debug("m_snFinishPartsNum = %s\r\n",melsec_cnc_data_t.m_snFinishPartsNum);
+				break;
+			}
+		case ID_TOOL_NUM:     
+			{
+				sprintf(melsec_cnc_data_t.m_snToolNum,"%ld;",l_value);
+				zlg_debug("m_snToolNum = %s\r\n",melsec_cnc_data_t.m_snToolNum);
+				break;
+			}  
+		case ID_FILE_NAME:  
+			{
+				sprintf(melsec_cnc_data_t.m_sCurProgramNo,"%s;",m_strValue);
+				zlg_debug("m_sCurProgramNo = %s\r\n",melsec_cnc_data_t.m_sCurProgramNo);
+				break;
+			}
+		case ID_BLOCK_NUM:  
+			{
+				sprintf(melsec_cnc_data_t.m_sCurProgramBlockNo,"%ld;",l_value);
+				zlg_debug("m_sCurProgramBlockNo = %s\r\n",melsec_cnc_data_t.m_sCurProgramBlockNo);
+				break;
+			}  
+		case ID_INPUT_FEEDRATE: 
+			{
+				sprintf(melsec_cnc_data_t.m_sdFeedOverride,"%s;",m_strValue);
+				zlg_debug("m_sdFeedOverride = %s\r\n",melsec_cnc_data_t.m_sdFeedOverride);
+				break;
+			} 
+		case ID_INPUT_SPENDLERATE:
+			{
+				sprintf(melsec_cnc_data_t.m_sSpindleOverride,"%s;",m_strValue);
+				zlg_debug("m_sSpindleOverride = %s\r\n",melsec_cnc_data_t.m_sSpindleOverride);
+				break;
+			}         
+		case ID_FEED_SET: 
+			{
+				sprintf(melsec_cnc_data_t.m_sFCmd,"%s;",m_strValue);
+				zlg_debug("m_sFCmd = %s\r\n",melsec_cnc_data_t.m_sFCmd);
+				break;
+			}    
+		case ID_FEED_ACT:  
+			{
+				sprintf(melsec_cnc_data_t.m_sFeedrate,"%s;",m_strValue);
+				zlg_debug("m_sFeedrate = %s\r\n",melsec_cnc_data_t.m_sFeedrate);
+				break;
+			}         
+		case ID_ALARM_MESSAGE:
+			{
+				int k=0;
+				int mm=0;				
+				if(data[8]==0x34)  
+				{
+					melsec_cnc_data_t.m_nAlarmNum = 0;
+				}
+				else 
+				{
+					if(data[8]>44)
+					{
+						ld.v=0;
+						ld.b[0]=data[28];
+						ld.b[1]=data[29];
+						ld.b[2]=data[30];
+						ld.b[3]=data[31]; 					
+						melsec_cnc_data_t.m_nAlarmNum = (int)(ld.v/59);
+						sprintf(melsec_cnc_data_t.m_sAlarmNumber,"%d;",melsec_cnc_data_t.m_nAlarmNum);	 
+						for(mm=0;mm< melsec_cnc_data_t.m_nAlarmNum;mm++)
+						{	
+							for(k=0;k<4;k++)
+								melsec_cnc_data_t.m_sAlarmType[mm*4+k] = data[35+k+mm*59];
+							melsec_cnc_data_t.m_sAlarmType[mm*4+k] = 0x00;
+							for(k=0;k<4;k++)	
+								melsec_cnc_data_t.m_sAlarmCode[mm*4+k] = data[35+30+k+mm*59];
+							melsec_cnc_data_t.m_sAlarmCode[mm*4+k] = 0x00;			   
+							alarm_msg = deal_with_alarm((const char *)melsec_cnc_data_t.m_sAlarmType,(const char *)melsec_cnc_data_t.m_sAlarmCode);
+							sprintf(melsec_cnc_data_t.m_sAlarmMsg,"%s;",alarm_msg);
+						}
+						melsec_cnc_data_t.m_sAlarmType[mm*4-1] = 0x3B;
+						melsec_cnc_data_t.m_sAlarmCode[mm*4-1] = 0x3B;
+					}	
+					zlg_debug("AlarmNum = %s\r\n",melsec_cnc_data_t.m_sAlarmNumber);
+					zlg_debug("m_sAlarmType = %s\r\n",melsec_cnc_data_t.m_sAlarmType);
+					zlg_debug("m_sAlarmCode = %s\r\n",melsec_cnc_data_t.m_sAlarmCode);
+					zlg_debug("m_sAlarmMsg = %s\r\n",melsec_cnc_data_t.m_sAlarmMsg);
+				}
+				break; 
+			}
+			default:
+			{
+				return -1;
+			}		
+		}                                         	
+	}
+	return 0;
 }
 
 char* SI_CNC_GetResult(unsigned char i)

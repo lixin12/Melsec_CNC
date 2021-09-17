@@ -1,6 +1,6 @@
 #include "type.h"
 #include "log.h"
-#include "Siemens_CNC.h"
+#include "Melsec_CNC.h"
 
 char* MQTTHOST = "www.ziyun-cloud.com";
 int   PORT     = 21669;

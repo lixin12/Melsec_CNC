@@ -21,7 +21,7 @@
 
 #include "type.h"
 #include "log.h"
-#include "Siemens_CNC.h"
+#include "Melsec_CNC.h"
 
 #define     T1           (20)    /*Connect timeout*/
 extern u32 TIMTICK;
@@ -34,8 +34,8 @@ int uart_isSendData = 0;
 
 int current_status = _INIT;
 
-char serverIP[20] = {"192.168.0.102"};
-u32 serverPort = 102; //   Port
+char serverIP[20] = {"192.168.0.103"};
+u32 serverPort = 683; //   Port
 
 char rev[2048];
 int len;
@@ -44,9 +44,7 @@ unsigned long sck_mode;
 
 struct sockaddr_in addr;
 
-static int si_CNC_send_end(void);
-
-static void print_Si_CNC_Data(char* data,int flag,int len)
+void print_collect_data(char* data,int flag,int len)
 {
 	u16 i = 0; 
     char buff[4096] = {0};
@@ -56,15 +54,15 @@ static void print_Si_CNC_Data(char* data,int flag,int len)
 	}
 	if(flag)
 	{
-		zlg_debug("Si_CNC_SendData:%s\r\n",buff);
+		zlg_debug("collect_send_data:%s\r\n",buff);
 	}
 	else
 	{
-		zlg_debug("Si_CNC_RecvData:%s\r\n",buff);
+		zlg_debug("collect_recv_data:%s\r\n",buff);
 	}
 }
 
-int Si_CNC_Init(void)
+int melsec_cnc_init(void)
 {
 	int i = 0;
 	if(sock>0)
@@ -87,163 +85,31 @@ int Si_CNC_Init(void)
 	{
 		return sock;
 	}
-
 	return 0;
 }
 
 
-int Si_CNC_NotConnect(void)
+int melsec_cnc_not_connect(void)
 {
 	int res;
+	struct timeval timeout={2,0};//3s
+	res=setsockopt(sock,SOL_SOCKET,SO_SNDTIMEO, (char *)&timeout,sizeof(timeout));
+	if(res != 0) return res;
+	res=setsockopt(sock,SOL_SOCKET,SO_RCVTIMEO,(char *)&timeout,sizeof(timeout));
+	if(res != 0) return res;
 	res = connect (sock, (struct sockaddr_in *)&addr, sizeof (addr));
 	return res;
 }
 
-int Si_CNC_Collect(void)
+int melsec_cnc_collect(void)
 {
-	int res = 0;
-    char* sendData = NULL;
-    char* datarev = NULL;
-	int i = 0;
-	int cnt = Get_Si_CNC_Collect_Num();
-	zlg_debug("cmd cnt = %d\r\n",cnt);
-	//for(i=0 ; i<cnt ; i++)
-	for(i=0 ; i<cnt ; i++)
-	{
-		sendData = Get_Si_CNC_CMD_STR(i);//数据打包
-		res = send (sock, (char*)(sendData), sendData[3], 0);
-		//sleep(1);
-		if(res<0)
-		{
-			zlg_debug("Send Error : %d\r\n",res);
-			return 2;
-		}
-		print_Si_CNC_Data(sendData,1,sendData[3]);
-		res = recv (sock, (char*)rev, sizeof(rev), 0);
-		if(res>0)
-		{
-			datarev = rev;
-			rev[res] = 0;
-		}
-		else
-		{
-			datarev = 0;
-		}
-		//datarev = IOT_Uart.uart_revDataTimeOut(baud,200);
-		if(datarev!=0)
-		{
-			print_Si_CNC_Data(datarev,0,res);
-			//datarev+=2;
-			if(0==Si_CNC_AnalyzeData(datarev,i))
-			{
-			}
-			else
-			{
-				if(close(sock)==0)
-					zlg_debug("socket close OK\r\n",i);
-				else
-					zlg_debug("socket close failed\r\n",i);
-				zlg_debug("analyze error! index = %d\r\n",i);
-				return 1;
-			}
-		}
-		else
-		{
-			zlg_debug("receive data error! index = %d\r\n",i);
-			return 2;
-		}
-	}
-	return 0;
+	return(get_melsec_cmd_str());//数据打包
 }
 
-
-static int si_CNC_send_end(void)
-{
-	int res = 0;
-	unsigned char p_send[] = { 0x03, 0x00, 0x00, 0x07, 0x02, 0xf0, 0x00 };
-	res = send(sock,(unsigned char*)p_send, p_send[3], 0);
-	print_Si_CNC_Data(p_send,1,p_send[3]);
-	if(res<0)
-	{
-		zlg_debug("Send Error : %d\r\n",res);
-		return 1;
-	}
-	return 0;
-}
-
-
-int m_CMDth = 0;
-
-int link_Si_CNC(void)
-{
-	int res = 0;
-	m_CMDth = 0;
-	Si_CNC_data.m_nCycleNum = 0;
-	unsigned char p_send[] = { 0x03,0x00,0x00,0x16,0x11,0xe0,0x00,0x00,0x00,0x48,0x00,0xc1,0x02,0x04,0x00,0xc2,0x02,0x0d,0x04,0xc0,0x01,0x0a };
-	p_send[9] = m_CMDth;
-	res = send(sock,(unsigned char*)p_send, p_send[3], 0);
-	print_Si_CNC_Data(p_send,1,p_send[3]);
-	if(res<0)
-	{
-		zlg_debug("Send Error : %d\r\n",res);
-		return 1;
-	}
-	res = recv (sock, (char*)rev, sizeof(rev), 0);
-	if(res>0)
-	{
-		print_Si_CNC_Data(rev,0,res);
-	}
-	else
-	{
-		return 2;
-	}
-	unsigned char p_send1[] = { 0x03,0x00,0x00,0x19,0x02,0xf0,0x80,0x32,0x01,0x00,0x00,0x00,0x01,0x00,0x08,0x00,0x00,0xf0,0x00,0x00,0x64,0x00,0x64,
-	0x03,0xc0 };
-	res = send(sock,(unsigned char*)p_send1, p_send1[3], 0);
-	print_Si_CNC_Data(p_send1,1,p_send1[3]);
-	if(res<0)
-	{
-		zlg_debug("Send Error : %d\r\n",res);
-		return 3;
-	}
-	res = recv (sock, (char*)rev, sizeof(rev), 0);
-	if(res>0)
-	{
-		print_Si_CNC_Data(rev,0,res);
-	}
-	else
-	{
-		return 4;
-	}
-	unsigned char p_send2[] = { 0x03,0x00,0x00,0x1d,0x02,0xf0,0x80,0x32,0x01,0x00,0x00,0x00,0x01,0x00,0x0c,0x00,0x00,0x04,0x01,0x12,0x08,0x82,0x01,
-	0x00,0x14,0x00,0x01,0x3b,0x01 };
-	res = send(sock,(unsigned char*)p_send2, p_send2[3], 0);
-	print_Si_CNC_Data(p_send2,1,p_send2[3]);
-	if(res<0)
-	{
-		zlg_debug("Send Error : %d\r\n",res);
-		return 5;
-
-	}
-	res = recv (sock, (char*)rev, sizeof(rev), 0);
-	if(res>0)
-	{
-		print_Si_CNC_Data(rev,0,res);
-	}
-	else
-	{
-		return 6;
-	}
-	if(si_CNC_send_end()!=0)
-	{
-		return 0;
-	}
-	return 0;
-}
 
 unsigned int notConnectTimeOut = 0;
 int SECS_TICK = 1;
-void app_Si_CNC_Logic(void)
+void app_melsec_cnc_logic(void)
 {
 	u8 t = 0;
 	u16 i = 0;
@@ -251,72 +117,60 @@ void app_Si_CNC_Logic(void)
 	char tmp[30] = {0};
 	switch(current_status)
 	{
-		case _INIT:
-			zlg_debug("INIT\r\n");
-			if(Si_CNC_Init()!=0)
+	case _INIT:
+		zlg_debug("INIT\r\n");
+		if(melsec_cnc_init()!=0)
+		{
+			current_status = _INIT;
+		}
+		else
+		{
+			current_status = _NotConnect;
+		}
+	break;
+	case _NotConnect:
+		zlg_debug("_NotConnect\r\n");
+		if(melsec_cnc_not_connect()!=0)
+		{
+			current_status = _NotConnect;
+			notConnectTimeOut++;
+            sleep(2);
+			if(notConnectTimeOut > T1)
 			{
+				notConnectTimeOut = 0;
 				current_status = _INIT;
 			}
-			else
+		}
+		else
+		{
+			notConnectTimeOut = 0;
+			current_status = _Collect_CNC;
+		}
+	break;
+	case _Collect_CNC:
+        SECS_TICK++;
+		if(!is_empty_MQCmd())
+		{
+			zlg_debug("is_empty_MQCmd success\r\n");
+			if(front_MQCmd().flag==1)
 			{
-				current_status = _NotConnect;
-			}
-		break;
-		case _NotConnect:
-			zlg_debug("_NotConnect\r\n");
-			if(Si_CNC_NotConnect()!=0)
-			{
-				current_status = _NotConnect;
-				notConnectTimeOut++;
-                sleep(2);
-				if(notConnectTimeOut > T1)
+				pop_MQCmd();
+				if(0==melsec_cnc_collect())
 				{
-					notConnectTimeOut = 0;
+					pack_analyze_result();//数据打包 
+					//RSTCP_SendData(TC_GetResult(0));
+					strncpy(sendDataReault,SI_CNC_GetResult(0),MQTT_MSG_MAX_LEN-40);
+					zlg_debug("analyze success:%s\r\n",SI_CNC_GetResult(0));
+					SI_CNC_ClearResult();
+				}
+				else
+				{
+					SI_CNC_ClearResult();
 					current_status = _INIT;
 				}
 			}
-			else
-			{
-				notConnectTimeOut = 0;
-				current_status = _Si_CNC_Connect;
-			}
-		break;
-		case _Si_CNC_Connect:
-			zlg_debug("_Si_CNC_Connect\r\n");
-			if(link_Si_CNC()!=0)
-			{
-				current_status = _INIT;
-			}
-			else
-			{
-				current_status = _Collect_CNC;
-			}
-			zlg_debug("ststus=%d\r\n",current_status);
-		break;
-		case _Collect_CNC:
-            SECS_TICK++;
-			if(!is_empty_MQCmd())
-			{
-				zlg_debug("is_empty_MQCmd success\r\n");
-				if(front_MQCmd().flag==1)
-				{
-					pop_MQCmd();
-					if(0==Si_CNC_Collect())
-					{
-						pack_analyze_result();//数据打包 
-						//RSTCP_SendData(TC_GetResult(0));
-						strncpy(sendDataReault,SI_CNC_GetResult(0),MQTT_MSG_MAX_LEN-40);
-						zlg_debug("analyze success:%s\r\n",SI_CNC_GetResult(0));
-						SI_CNC_ClearResult();
-					}
-					else
-					{
-						SI_CNC_ClearResult();
-						current_status = _INIT;
-					}
-				}
-			}
-		break;
+		}
+	break;
 	}
 }
 

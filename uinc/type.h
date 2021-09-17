@@ -17,8 +17,7 @@ typedef unsigned short u16;
 
 #define _INIT            0x1
 #define _NotConnect      0x2 
-#define _Si_CNC_Connect  0x3
-#define _Collect_CNC     0x4
+#define _Collect_CNC     0x3
 
 typedef struct
 {
