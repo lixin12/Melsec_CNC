@@ -9,7 +9,7 @@
 #include <time.h>
 
 #define MQTT_MSG_MAX_LEN	(1024*2)
-#define ZLG_DEBUG 2
+#define ZLG_DEBUG 4
 
 typedef unsigned char u8;
 typedef unsigned int u32;

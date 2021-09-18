@@ -379,6 +379,11 @@ int melsec_cnc_analyze_data(unsigned char* data)
 					sprintf(melsec_cnc_data_t.m_snCncStatus,"%d;",melsec_cnc_data_t.m_nCncStatus);
 					sprintf(melsec_cnc_data_t.m_sProgramStatus,"%d;",melsec_cnc_data_t.m_ProgramStatus);
 				}	
+				else
+				{
+					sprintf(melsec_cnc_data_t.m_snCncStatus,"%d;",melsec_cnc_data_t.m_nCncStatus);
+					sprintf(melsec_cnc_data_t.m_sProgramStatus,"%d;",melsec_cnc_data_t.m_ProgramStatus);
+				}
 				zlg_debug("m_snCncStatus = %s\r\n",melsec_cnc_data_t.m_snCncStatus);
 				zlg_debug("m_sProgramStatus = %s\r\n",melsec_cnc_data_t.m_sProgramStatus);		
 				break;
